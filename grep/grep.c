@@ -1,6 +1,8 @@
+#include <alloca.h>
+#include <errno.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-
+#include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -10,6 +12,11 @@
 
 static char* pattern = NULL;
 static int32_t options = 0;
+
+static void dirOrFile(char* name); 
+static char* readParameter(int32_t argc, char** argv); 
+static void traverseFile(char* file); 
+static void traverseDir(char* dir); 
 
 enum OPTIONS{
 	RECURSIVE = 1 << 1,
@@ -27,7 +34,7 @@ static void die(char* msg){
 	exit(EXIT_FAILURE);
 }
 
-static char* readParameter(int argc, char** argv){
+static char* readParameter(int32_t argc, char** argv){
 	char* dir = NULL;
 	bool pattern_set = false;
 	if(argc < 3){
@@ -42,6 +49,7 @@ static char* readParameter(int argc, char** argv){
 				case 'r': options |= RECURSIVE; break;
 				case 's': options |= REPLACE; break;
 				case 'e': options |= EXACT; break;
+				case 'd': err("depthmax: TBD"); break;
 				default: err("Argument not known");
 			}
 		}
@@ -68,7 +76,35 @@ static char* readParameter(int argc, char** argv){
 	return dir;
 }
 static void traverseDir(char* dir){
-
+	DIR* d = opendir(dir);
+	if(NULL == d){
+		die("opendir");
+	}
+	int32_t cap = 256;
+	char* name = alloca(cap);
+	while (true) {
+		errno = 0;
+		struct dirent* entry = readdir(d);
+		if(entry == NULL) break;
+		if(strcmp("..", entry ->d_name) == 0 || strcmp(".", entry ->d_name) == 0){
+			continue;
+		}
+		int32_t size = strlen(dir) + strlen(entry->d_name) + 1 + 1;
+		if(size > cap){
+			cap *= 2;
+			char* name = alloca(cap);
+		}
+		if(dir[strlen(dir) - 1] == '/'){
+			dir[strlen(dir) - 1] = '\0';
+		}
+		snprintf(name, size, "%s/%s", dir, entry->d_name);
+		dirOrFile(name);
+		
+	}
+	if(errno != 0) die("readdir");
+	if(closedir(d) != 0){
+		die("closedir");
+	}
 }
 
 static void traverseFile(char* file){
@@ -123,18 +159,21 @@ static void traverseFile(char* file){
 	free(line);
 }
 
-int main(int argc, char** argv){
-	char* start = readParameter(argc, argv);
+static void dirOrFile(char* name){
 	struct stat sb;
-	if(-1 == stat(start, &sb)){
+	if(-1 == stat(name, &sb)){
 		die("stat");
 	}
-
 	switch (sb.st_mode & S_IFMT) {
-		case S_IFDIR: traverseDir(start); break;
-		case S_IFREG: traverseFile(start); break;
+		case S_IFDIR: traverseDir(name); break;
+		case S_IFREG: traverseFile(name); break;
 		default: err("Not useful filetype");
 	}
+}
+
+int main(int argc, char** argv){
+	char* start = readParameter(argc, argv);
+	dirOrFile(start)	;
 
 	if(!(EXACT & options)){
 		free(pattern);
