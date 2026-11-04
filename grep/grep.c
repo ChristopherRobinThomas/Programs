@@ -15,6 +15,7 @@ enum OPTIONS{
 	RECURSIVE = 1 << 1,
 	REPLACE = 1 << 2,
 };
+
 static void err(char* msg){
 	fprintf(stderr, "%s\n", msg);
 	exit(EXIT_FAILURE);
@@ -44,6 +45,7 @@ static char* readParameter(int argc, char** argv){
 		}
 		else if(!pattern_set){
 			pattern = argv[i];
+			pattern_set = true;
 		}
 		else if(NULL == dir){
 			dir = argv[i];
@@ -73,9 +75,9 @@ static void traverseFile(char* file){
 		line_number++;
 		int32_t line_len = strlen(line);
 		// Make sure to read whole line
-		if(line[line_len] != '\n'){
+		if(line[line_len - 1] != '\n'){
 			while(true){
-				if(cap == line_len){
+				if(cap <= line_len - 1){
 					cap *= 2;
 					line = realloc(line, cap);
 					if(NULL == line){
@@ -91,8 +93,8 @@ static void traverseFile(char* file){
 			}
 		}
 		// Remove last line
-		if(line[line_len] == '\n'){
-			line[line_len] = '\0';
+		if(line[line_len - 1] == '\n'){
+			line[line_len - 1] = '\0';
 			line_len--;
 		}
 		int32_t ret = fnmatch(pattern, line, 0)	;
