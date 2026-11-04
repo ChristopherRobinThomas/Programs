@@ -14,6 +14,7 @@ static int32_t options = 0;
 enum OPTIONS{
 	RECURSIVE = 1 << 1,
 	REPLACE = 1 << 2,
+	EXACT = 1 << 3,
 };
 
 static void err(char* msg){
@@ -40,6 +41,7 @@ static char* readParameter(int argc, char** argv){
 			switch(argv[i][1]){
 				case 'r': options |= RECURSIVE; break;
 				case 's': options |= REPLACE; break;
+				case 'e': options |= EXACT; break;
 				default: err("Argument not known");
 			}
 		}
@@ -52,6 +54,16 @@ static char* readParameter(int argc, char** argv){
 		}else{
 			err("usage: grep <Pattern> <Directory>");
 		}
+	}
+	if(!(EXACT & options)){
+		int32_t l = strlen(pattern);
+		char* tmp = malloc(l + 3);
+		if(NULL == tmp) die("malloc");
+		strcpy(tmp + 1, pattern);
+		tmp[0] = '*';
+		tmp[l + 1] = '*';
+		tmp[l + 2] = '\0';
+		pattern = tmp;
 	}
 	return dir;
 }
@@ -99,7 +111,7 @@ static void traverseFile(char* file){
 		}
 		int32_t ret = fnmatch(pattern, line, 0)	;
 		if(0 == ret){
-			if(printf("%s:%d : %s", file, line_number, line) < 0){
+			if(printf("%s:%d: %s\n", file, line_number, line) < 0){
 				die("printf");
 			}
 		}
@@ -124,5 +136,8 @@ int main(int argc, char** argv){
 		default: err("Not useful filetype");
 	}
 
+	if(!(EXACT & options)){
+		free(pattern);
+	}
 	exit(EXIT_SUCCESS);
 }
